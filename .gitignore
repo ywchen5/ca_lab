@@ -1,0 +1,17 @@
+*.mem
+*.cache/
+*.hw/
+*.runs/
+*.sim/
+*.xpr
+*.backup.jou
+*.backup.log
+*.jou
+*.log
+*.str
+
+
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
