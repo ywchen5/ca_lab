@@ -73,14 +73,65 @@ module  RV32core(
     
     add_32 add_IF(.a(PC_IF),.b(32'd4),.c(PC_4_IF));
 
-    MUX2T1_32 mux_IF(.I0(PC_4_IF),.I1(jump_PC_ID),.s(Branch_ctrl),.o(next_PC_IF));        
+    // MUX2T1_32 mux_IF(.I0(final_PC_IF),.I1(jump_PC_ID),.s(Branch_ctrl && ~jump_right),.o(next_PC_IF));   // change I0 to final_PC_IF, s to Branch_ctrl && ~predict_right  
+
+    assign next_PC_IF = Branch_ctrl ? jump_right ? final_PC_IF :  // jump right
+                                                   jump_PC_ID : // not jump when branch
+                                      jump_right ? final_PC_IF : // jump right
+                                                   PC_ID + 4;  // jump when not branch
+    wire next_PC_IF_reg;
+    REG32 REG_next_PC(.clk(debug_clk),.rst(rst),.CE(1'b1),.D(next_PC_IF),.Q(next_PC_IF_reg));
 
     ROM_D inst_rom(.a(PC_IF[9:2]),.spo(inst_IF));
 
+    // my codes are added below
+    wire Branch_predict, last_Branch_predict;
+    BHT bht(.clk(debug_clk),.rst(rst),.PC_IF(PC_IF),.bht_wen(~predict_right),
+        .taken(Branch_ctrl && PC_EN_IF),.bht_pridict(Branch_predict));
 
+    wire btb_hit, last_btb_hit, btb_wen;
+    wire [31:0] PC_predict;
+    BTB btb(.clk(debug_clk),.rst(rst),.PC_IF(PC_IF),.PC_ID(PC_ID),.PC_jump(jump_PC_ID),
+        .btb_wen(btb_wen),.hit(btb_hit),.btb_rdata(PC_predict));
+
+    reg btb_hit_reg, Branch_predict_reg, Branch_ctrl_reg, jump_right_reg;
+    initial begin
+        btb_hit_reg = 1'b0;
+        Branch_predict_reg = 1'b0;
+        Branch_ctrl_reg = 1'b0;
+        jump_right_reg = 1'b0;
+    end
+    always @(posedge debug_clk or posedge rst) begin
+        if (rst) begin
+            btb_hit_reg <= 1'b0;
+            Branch_predict_reg <= 1'b0;
+            Branch_ctrl_reg <= 1'b0;
+            jump_right_reg <= 1'b0;
+        end else begin
+            btb_hit_reg <= btb_hit;
+            Branch_predict_reg <= Branch_predict;
+            Branch_ctrl_reg <= Branch_ctrl;
+            jump_right_reg <= jump_right;
+        end
+    end
+    assign last_btb_hit = btb_hit_reg;
+    assign last_Branch_predict = Branch_predict_reg;
+    assign btb_wen = Branch_ctrl && PC_EN_IF;
+
+    MUX2T1_32 mux_branch_pridict(.I0(PC_4_IF),.I1(PC_predict),.s(Branch_predict && btb_hit),.o(final_PC_IF)); // choose the predicted PC or the next PC
+    
+    wire predict_right;
+    assign predict_right = last_Branch_predict == Branch_ctrl;
+    wire jump_right;
+    assign jump_right = Branch_ctrl ? (PC_IF == jump_PC_ID) : (~last_Branch_predict || ~last_btb_hit);
+
+    wire reg_FD_flush_of_predict;
+    assign reg_FD_flush_of_predict = (Branch_ctrl_reg && ~jump_right_reg) ? Branch_ctrl ? ~jump_right : 
+                                                                                          1'b0 : 
+                                                                            ~jump_right;
     // ID
     REG_IF_ID reg_IF_ID(.clk(debug_clk),.rst(rst),.EN(1'b1),.Data_stall(reg_FD_stall),
-        .flush(reg_FD_flush),.PCOUT(PC_IF),.IR(inst_IF),
+        .flush(reg_FD_flush_of_predict),.PCOUT(PC_IF),.IR(inst_IF),
 
         .IR_ID(inst_ID),.PCurrent_ID(PC_ID),.isFlushed(isFlushed_ID));
     

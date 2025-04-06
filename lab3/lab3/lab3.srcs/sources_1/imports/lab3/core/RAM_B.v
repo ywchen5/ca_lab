@@ -17,7 +17,7 @@ module RAM_B(
     reg[7:0] data[0:SIZE-1];
 
     initial	begin
-        $readmemh("ram.mem", data);
+        $readmemh("D:\\study\\year2sem2\\ca\\ca_lab\\ca_lab\\lab3\\ram.mem", data);
     end
 
     always @ (negedge clka) begin

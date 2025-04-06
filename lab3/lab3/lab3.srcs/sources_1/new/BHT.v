@@ -3,10 +3,10 @@
 module BHT(
     input clk,
     input rst,
-    input [31:0] pc,
+    input [31:0] PC_IF,
     input bht_wen,
     input taken,
-    output wire bht_rdata
+    output wire bht_pridict
     );
 
     parameter Pridict_Strongly_Taken = 2'b11;
@@ -14,31 +14,44 @@ module BHT(
     parameter Pridict_Weakly_Not_Taken = 2'b01;
     parameter Pridict_Strongly_Not_Taken = 2'b00;
 
+    reg [31:0] PC_IF_reg;
+    initial begin
+        PC_IF_reg = 32'b0; // Initialize the PC_IF register
+    end
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            PC_IF_reg <= 32'b0; // Reset the PC_IF register
+        end else begin
+            PC_IF_reg <= PC_IF; // Update the PC_IF register
+        end
+    end
+
+
     // 2-bit FSM
-    reg [1:0] bht [0:8]; // 9 entries for 2-bit FSM  
+    reg [1:0] bht [0:255]; // 255 entries for 2-bit FSM  
     integer i;
     initial begin
-        for (i = 0; i < 8; i = i + 1) begin
-            bht[i] = Pridict_Strongly_Not_Taken; // Initialize all entries to Strongly Not Taken
+        for (i = 0; i < 256; i = i + 1) begin
+            bht[i] = Pridict_Weakly_Not_Taken; // Initialize all entries to Weakly Not Taken
         end
     end
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            for (i = 0; i < 8; i = i + 1) begin
-                bht[i] <= Pridict_Strongly_Not_Taken; // Reset all entries to Strongly Not Taken
+            for (i = 0; i < 256; i = i + 1) begin
+                bht[i] <= Pridict_Weakly_Not_Taken; // Reset all entries to Weakly Not Taken
             end
         end else begin
             if (bht_wen) begin
                 if (taken) begin
-                    bht[pc[8:0]] <= (bht[pc[8:0]] == Pridict_Strongly_Taken) ? Pridict_Strongly_Taken : bht[pc[8:0]] + 1; // Increment if taken
+                    bht[PC_IF_reg[9:2]] <= (bht[PC_IF_reg[9:2]] == Pridict_Strongly_Taken) ? Pridict_Strongly_Taken : bht[PC_IF_reg[9:2]] + 1; // Increment if taken
                 end else begin
-                    bht[pc[8:0]] <= (bht[pc[8:0]] == Pridict_Strongly_Not_Taken) ? Pridict_Strongly_Not_Taken : bht[pc[8:0]] - 1; // Decrement if not taken
+                    bht[PC_IF_reg[9:2]] <= (bht[PC_IF_reg[9:2]] == Pridict_Strongly_Not_Taken) ? Pridict_Strongly_Not_Taken : bht[PC_IF_reg[9:2]] - 1; // Decrement if not taken
                 end
             end
         end
     end
 
-    assign bht_rdata = bht[pc[8:0]] >= Pridict_Weakly_Taken;
+    assign bht_pridict = bht[PC_IF[9:2]] >= Pridict_Weakly_Taken;
 
 endmodule
