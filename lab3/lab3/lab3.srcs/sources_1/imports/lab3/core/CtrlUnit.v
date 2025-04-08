@@ -5,7 +5,7 @@ module CtrlUnit(
     input[31:0] inst,
     input cmp_res,
     output Branch, ALUSrc_A, ALUSrc_B, DatatoReg, RegWrite, mem_w,
-        mem_r, rs1use, rs2use,
+        mem_r, rs1use, rs2use, is_jump,
     output [1:0] hazard_optype,
     output [2:0] ImmSel, cmp_ctrl,
     output [3:0] ALUControl,
@@ -185,5 +185,7 @@ module CtrlUnit(
         LUI | AUIPC | CSR_valid | MRET | ECALL);
     
     assign exp_vector = {illegal_inst, ECALL};
+
+    assign is_jump = JAL | JALR | B_valid;
 
 endmodule

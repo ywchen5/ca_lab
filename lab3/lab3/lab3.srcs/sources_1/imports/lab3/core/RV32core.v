@@ -78,15 +78,15 @@ module  RV32core(
     assign next_PC_IF = Branch_ctrl ? jump_right ? final_PC_IF :  // jump right
                                                    jump_PC_ID : // not jump when branch
                                       jump_right ? final_PC_IF : // jump right
-                                                   PC_ID + 4;  // jump when not branch
-    wire next_PC_IF_reg;
-    REG32 REG_next_PC(.clk(debug_clk),.rst(rst),.CE(1'b1),.D(next_PC_IF),.Q(next_PC_IF_reg));
+                                                   reg_FD_flush_of_predict_reg ? final_PC_IF : // flush
+                                                                                 PC_ID + 4;
 
     ROM_D inst_rom(.a(PC_IF[9:2]),.spo(inst_IF));
 
     // my codes are added below
+    wire is_jump;
     wire Branch_predict, last_Branch_predict;
-    BHT bht(.clk(debug_clk),.rst(rst),.PC_IF(PC_IF),.bht_wen(~predict_right),
+    BHT bht(.clk(debug_clk),.rst(rst),.PC_IF(PC_IF),.bht_wen(is_jump && PC_EN_IF),
         .taken(Branch_ctrl && PC_EN_IF),.bht_pridict(Branch_predict));
 
     wire btb_hit, last_btb_hit, btb_wen;
@@ -94,12 +94,13 @@ module  RV32core(
     BTB btb(.clk(debug_clk),.rst(rst),.PC_IF(PC_IF),.PC_ID(PC_ID),.PC_jump(jump_PC_ID),
         .btb_wen(btb_wen),.hit(btb_hit),.btb_rdata(PC_predict));
 
-    reg btb_hit_reg, Branch_predict_reg, Branch_ctrl_reg, jump_right_reg;
+    reg btb_hit_reg, Branch_predict_reg, Branch_ctrl_reg, jump_right_reg, reg_FD_flush_of_predict_reg;
     initial begin
         btb_hit_reg = 1'b0;
         Branch_predict_reg = 1'b0;
         Branch_ctrl_reg = 1'b0;
         jump_right_reg = 1'b0;
+        reg_FD_flush_of_predict_reg = 1'b0;
     end
     always @(posedge debug_clk or posedge rst) begin
         if (rst) begin
@@ -107,16 +108,18 @@ module  RV32core(
             Branch_predict_reg <= 1'b0;
             Branch_ctrl_reg <= 1'b0;
             jump_right_reg <= 1'b0;
+            reg_FD_flush_of_predict_reg <= 1'b0;
         end else begin
             btb_hit_reg <= btb_hit;
             Branch_predict_reg <= Branch_predict;
             Branch_ctrl_reg <= Branch_ctrl;
             jump_right_reg <= jump_right;
+            reg_FD_flush_of_predict_reg <= reg_FD_flush_of_predict;
         end
     end
     assign last_btb_hit = btb_hit_reg;
     assign last_Branch_predict = Branch_predict_reg;
-    assign btb_wen = Branch_ctrl && PC_EN_IF;
+    assign btb_wen = Branch_ctrl && ~last_btb_hit;
 
     MUX2T1_32 mux_branch_pridict(.I0(PC_4_IF),.I1(PC_predict),.s(Branch_predict && btb_hit),.o(final_PC_IF)); // choose the predicted PC or the next PC
     
@@ -126,9 +129,9 @@ module  RV32core(
     assign jump_right = Branch_ctrl ? (PC_IF == jump_PC_ID) : (~last_Branch_predict || ~last_btb_hit);
 
     wire reg_FD_flush_of_predict;
-    assign reg_FD_flush_of_predict = (Branch_ctrl_reg && ~jump_right_reg) ? Branch_ctrl ? ~jump_right : 
-                                                                                          1'b0 : 
-                                                                            ~jump_right;
+    assign reg_FD_flush_of_predict = (~jump_right_reg) ? Branch_ctrl ? ~jump_right : 
+                                                                       PC_IF == jump_PC_ID : // jump right
+                                                        ~jump_right;
     // ID
     REG_IF_ID reg_IF_ID(.clk(debug_clk),.rst(rst),.EN(1'b1),.Data_stall(reg_FD_stall),
         .flush(reg_FD_flush_of_predict),.PCOUT(PC_IF),.IR(inst_IF),
@@ -140,7 +143,7 @@ module  RV32core(
         .mem_w(mem_w_ctrl),.mem_r(mem_r_ctrl),.rs1use(rs1use_ctrl),.rs2use(rs2use_ctrl),
         .hazard_optype(hazard_optype_ctrl),.ImmSel(ImmSel_ctrl),.cmp_ctrl(cmp_ctrl),
         .ALUControl(ALUControl_ctrl),.JALR(JALR),.MRET(MRET),.csr_rw(csr_rw_ctrl),
-        .csr_w_imm_mux(csr_w_imm_mux_ctrl),.exp_vector(exp_vector_ctrl));
+        .csr_w_imm_mux(csr_w_imm_mux_ctrl),.exp_vector(exp_vector_ctrl),.is_jump(is_jump));
     
     Regs register(.clk(debug_clk),.rst(rst),.L_S(RegWrite_WB),
         .R_addr_A(inst_ID[19:15]),.R_addr_B(inst_ID[24:20]),
