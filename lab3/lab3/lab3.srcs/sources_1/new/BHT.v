@@ -14,6 +14,8 @@ module BHT(
     parameter Pridict_Weakly_Not_Taken = 2'b01;
     parameter Pridict_Strongly_Not_Taken = 2'b00;
 
+    parameter BHT_SIZE = 256; // Number of entries in the BHT
+
     reg [31:0] PC_IF_reg;
     initial begin
         PC_IF_reg = 32'b0; // Initialize the PC_IF register
@@ -28,17 +30,17 @@ module BHT(
 
 
     // 2-bit FSM
-    reg [1:0] bht [0:255]; // 255 entries for 2-bit FSM  
+    reg [1:0] bht [0:BHT_SIZE - 1]; // 255 entries for 2-bit FSM  
     integer i;
     initial begin
-        for (i = 0; i < 256; i = i + 1) begin
+        for (i = 0; i < BHT_SIZE; i = i + 1) begin
             bht[i] = Pridict_Weakly_Not_Taken; // Initialize all entries to Weakly Not Taken
         end
     end
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            for (i = 0; i < 256; i = i + 1) begin
+            for (i = 0; i < BHT_SIZE; i = i + 1) begin
                 bht[i] <= Pridict_Weakly_Not_Taken; // Reset all entries to Weakly Not Taken
             end
         end else begin

@@ -132,6 +132,15 @@ module  RV32core(
     assign reg_FD_flush_of_predict = (~jump_right_reg) ? Branch_ctrl ? ~jump_right : 
                                                                        PC_IF == jump_PC_ID : // jump right
                                                         ~jump_right;
+
+    // assign reg_FD_flush_of_predict = ~jump_right; // jump_right_reg err diplay
+    // assign reg_FD_flush_of_predict = ~jump_right_reg ? 1'b0 : // Branch_ctrl err display
+    //                                                 ~jump_right;
+
+    // assign reg_FD_flush_of_predict = ~jump_right_reg ? Branch_ctrl ? ~jump_right : // patch display
+    //                                                     1'b0 :
+    //                                         ~jump_right;
+       
     // ID
     REG_IF_ID reg_IF_ID(.clk(debug_clk),.rst(rst),.EN(1'b1),.Data_stall(reg_FD_stall),
         .flush(reg_FD_flush_of_predict),.PCOUT(PC_IF),.IR(inst_IF),
