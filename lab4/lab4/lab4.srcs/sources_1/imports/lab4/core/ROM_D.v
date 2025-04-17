@@ -8,7 +8,7 @@ module ROM_D(
     reg[31:0] inst_data[0:255];
 
     initial	begin
-        $readmemh("rom.mem", inst_data);
+        $readmemh("D:\\study\\year2sem2\\ca\\ca_lab\\ca_lab\\lab4\\rom.mem", inst_data);
     end
 
     assign spo = inst_data[a];
